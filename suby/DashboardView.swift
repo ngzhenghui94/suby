@@ -39,7 +39,7 @@ struct DashboardView: View {
                     VStack(spacing: 30) {
                         // Custom Header
                         HStack {
-                            Text("Subscriptions")
+                            Text("Subly")
                                 .font(.system(.largeTitle, design: .rounded))
                                 .fontWeight(.bold)
                                 .foregroundStyle(.white)
