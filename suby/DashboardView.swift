@@ -15,6 +15,7 @@ struct DashboardView: View {
     @State private var currencyManager = CurrencyManager()
     
     // Simple currency converter (fixed for now as per plan)
+    // removed - use currency api to fetch correct currency
     // let usdToSgd = 1.35
     
     var totalMonthlyUSD: Double {
@@ -102,37 +103,10 @@ struct DashboardView: View {
                                     .padding(.horizontal)
                                 
                                 ForEach(subscriptions) { sub in
-                                    HStack(spacing: 15) {
-                                        Circle()
-                                            .fill(Color(hex: sub.colorHex).gradient(to: Color(hex: sub.colorHex).opacity(0.7)))
-                                            .frame(width: 40, height: 40)
-                                            .overlay(Image(systemName: sub.iconName).font(.caption).foregroundColor(.white))
-                                            .shadow(color: Color(hex: sub.colorHex).opacity(0.5), radius: 5)
-                                        
-                                        VStack(alignment: .leading) {
-                                            Text(sub.name)
-                                                .font(.body)
-                                                .fontWeight(.semibold)
-                                                .foregroundStyle(.white)
-                                            Text(sub.billingCycle)
-                                                .font(.caption)
-                                                .foregroundStyle(.gray)
+                                    SubscriptionRowView(subscription: sub)
+                                        .onTapGesture {
+                                            selectedSubscription = sub
                                         }
-                                        
-                                        Spacer()
-                                        
-                                        VStack(alignment: .trailing) {
-                                            Text("\(sub.currency) \(sub.price, specifier: "%.2f")")
-                                                .font(.callout)
-                                                .fontWeight(.bold)
-                                                .foregroundStyle(.white)
-                                        }
-                                    }
-                                    .padding()
-                                    .glassEffect()
-                                    .onTapGesture {
-                                        selectedSubscription = sub
-                                    }
                                 }
                                 .padding(.horizontal)
                             }
@@ -161,36 +135,5 @@ struct DashboardView: View {
         formatter.currencyCode = code
         formatter.maximumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value)) ?? ""
-    }
-}
-
-struct GlassStatsCard: View {
-    let title: String
-    let mainValue: String
-    let subValue: String?
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.caption)
-                .textCase(.uppercase)
-                .foregroundStyle(.gray)
-            
-            Text(mainValue)
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-                .minimumScaleFactor(0.5)
-                .lineLimit(1)
-            
-            if let sub = subValue {
-                Text(sub)
-                    .font(.caption)
-                    .foregroundStyle(.gray.opacity(0.8))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .glassEffect()
     }
 }
