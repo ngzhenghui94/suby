@@ -13,10 +13,7 @@ struct DashboardView: View {
     @State private var showingAddSheet = false
     @State private var selectedSubscription: Subscription?
     @State private var currencyManager = CurrencyManager()
-    
-    // Simple currency converter (fixed for now as per plan)
-    // removed - use currency api to fetch correct currency
-    // let usdToSgd = 1.35
+    @AppStorage("accentColor") private var accentColorHex: String = "#5E5CE6"
     
     var totalMonthlyUSD: Double {
         subscriptions.reduce(0) { total, sub in
@@ -50,21 +47,26 @@ struct DashboardView: View {
                             NavigationLink {
                                 AnalyticsView()
                                     .environment(currencyManager)
+                                    .onAppear { HapticManager.selection() }
                             } label: {
                                 Image(systemName: "chart.pie.fill")
                                     .font(.title2)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color(hex: accentColorHex))
                                     .padding(10)
                                     .background(Material.ultraThin)
                                     .clipShape(Circle())
                             }
+                            .simultaneousGesture(TapGesture().onEnded {
+                                HapticManager.impact(.light)
+                            })
                             
                             Button {
+                                HapticManager.impact(.medium)
                                 showingAddSheet = true
                             } label: {
                                 Image(systemName: "plus")
                                     .font(.title2)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color(hex: accentColorHex))
                                     .padding(10)
                                     .background(Material.ultraThin)
                                     .clipShape(Circle())

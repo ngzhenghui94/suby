@@ -145,6 +145,8 @@ struct AddSubscriptionView: View {
             )
             modelContext.insert(newSub)
         }
+        }
+        HapticManager.notification(.success)
         dismiss()
     }
 }

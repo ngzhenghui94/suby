@@ -33,6 +33,7 @@ struct BubbleCloudView: View {
                     BubbleView(subscription: sub)
                         .position(position)
                         .onTapGesture {
+                            HapticManager.selection()
                             onSelect(sub)
                         }
                 }
