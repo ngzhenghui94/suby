@@ -72,7 +72,7 @@ struct DashboardView: View {
                                 BubbleCloudView(subscriptions: subscriptions) { sub in
                                     selectedSubscription = sub
                                 }
-                                .frame(height: 400) // Give it substantial space
+                                .aspectRatio(1.0, contentMode: .fit) // Responsive square layout
                             } else {
                                 ContentUnavailableView("No Subscriptions", systemImage: "bubble.left.and.bubble.right")
                             }

@@ -94,7 +94,7 @@ struct AddSubscriptionView: View {
                     Button(subscription == nil ? "Add" : "Save") {
                         saveSubscription()
                     }
-                    .disabled(name.isEmpty)
+                    .disabled(name.isEmpty || price < 0)
                 }
             }
             .onAppear {
