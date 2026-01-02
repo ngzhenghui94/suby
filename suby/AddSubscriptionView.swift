@@ -18,12 +18,13 @@ struct AddSubscriptionView: View {
     @State private var price: Double = 9.99
     @State private var currency: String = "USD"
     @State private var billingCycle: String = "Monthly"
+    @State private var category: String = "Entertainment"
     @State private var startDate: Date = Date()
     @State private var colorHex: String = "#5E5CE6"
     
     let currencies = ["USD", "SGD", "EUR", "GBP"]
     let cycles = ["Monthly", "Yearly"]
-    let colors = ["#5E5CE6", "#FF2D55", "#30B0C7", "#FF9F0A", "#32D74B", "#AF52DE", "#FF375F", "#007AFF"]
+    let colors = ["#5E5CE6", "#FF2D55", "#30B0C7", "#FF9F0A", "#32D74B", "#AF52DE", "#FF375F", "#007AFF", "#FFD60A"]
     
     init(subscription: Subscription? = nil) {
         self.subscription = subscription
@@ -45,6 +46,12 @@ struct AddSubscriptionView: View {
                             }
                         }
                         .labelsHidden()
+                    }
+                    
+                    Picker("Category", selection: $category) {
+                        ForEach(SubscriptionCategory.allCases) { cat in
+                            Label(cat.rawValue, systemImage: cat.icon).tag(cat.rawValue)
+                        }
                     }
                     
                     Picker("Billing Cycle", selection: $billingCycle) {
@@ -96,8 +103,19 @@ struct AddSubscriptionView: View {
                     price = sub.price
                     currency = sub.currency
                     billingCycle = sub.billingCycle
+                    category = sub.category
                     startDate = sub.startDate
                     colorHex = sub.colorHex
+                } else {
+                    // Pre-select color based on category default?
+                    // For now, keep as is
+                }
+            }
+            .onChange(of: category) { oldValue, newValue in
+                if subscription == nil { // Only auto-set color for new subs
+                    if let catEnum = SubscriptionCategory(rawValue: newValue) {
+                        colorHex = catEnum.color
+                    }
                 }
             }
         }
@@ -111,6 +129,7 @@ struct AddSubscriptionView: View {
             sub.price = price
             sub.currency = currency
             sub.billingCycle = billingCycle
+            sub.category = category
             sub.startDate = startDate
             sub.colorHex = colorHex
         } else {
@@ -121,7 +140,8 @@ struct AddSubscriptionView: View {
                 currency: currency,
                 billingCycle: billingCycle,
                 startDate: startDate,
-                colorHex: colorHex
+                colorHex: colorHex,
+                category: category
             )
             modelContext.insert(newSub)
         }

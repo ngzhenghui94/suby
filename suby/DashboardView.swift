@@ -12,18 +12,16 @@ struct DashboardView: View {
     @Query private var subscriptions: [Subscription]
     @State private var showingAddSheet = false
     @State private var selectedSubscription: Subscription?
+    @State private var currencyManager = CurrencyManager()
     
     // Simple currency converter (fixed for now as per plan)
-    let usdToSgd = 1.35
+    // let usdToSgd = 1.35
     
     var totalMonthlyUSD: Double {
         subscriptions.reduce(0) { total, sub in
             let monthlyCost = sub.monthlyCost
-            // Convert everything to USD base for calculation if needed,
-            // but for now let's assume input is mixed and we just want a raw total?
-            // Actually, let's normalize to USD for the "Total Monthly" display if the user mixes currencies.
-            // Simplified: If currency is SGD, convert back to USD.
-            let costInUSD = sub.currency == "SGD" ? monthlyCost / usdToSgd : monthlyCost
+            // Convert to USD using manager
+            let costInUSD = currencyManager.convert(monthlyCost, from: sub.currency, to: "USD")
             return total + costInUSD
         }
     }
@@ -46,6 +44,20 @@ struct DashboardView: View {
                                 .fontWeight(.bold)
                                 .foregroundStyle(.white)
                             Spacer()
+                            
+                            // Analytics Button
+                            NavigationLink {
+                                AnalyticsView()
+                                    .environment(currencyManager)
+                            } label: {
+                                Image(systemName: "chart.pie.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(.white)
+                                    .padding(10)
+                                    .background(Material.ultraThin)
+                                    .clipShape(Circle())
+                            }
+                            
                             Button {
                                 showingAddSheet = true
                             } label: {
@@ -61,8 +73,8 @@ struct DashboardView: View {
                         
                         // Stats Row
                         HStack(spacing: 12) {
-                            GlassStatsCard(title: "Monthly", mainValue: formatCurrency(totalMonthlyUSD, "USD"), subValue: formatCurrency(totalMonthlyUSD * usdToSgd, "SGD"))
-                            GlassStatsCard(title: "Annually", mainValue: formatCurrency(totalAnnuallyUSD, "USD"), subValue: formatCurrency(totalAnnuallyUSD * usdToSgd, "SGD"))
+                            GlassStatsCard(title: "Monthly", mainValue: formatCurrency(totalMonthlyUSD, "USD"), subValue: formatCurrency(currencyManager.convert(totalMonthlyUSD, from: "USD", to: "SGD"), "SGD"))
+                            GlassStatsCard(title: "Annually", mainValue: formatCurrency(totalAnnuallyUSD, "USD"), subValue: formatCurrency(currencyManager.convert(totalAnnuallyUSD, from: "USD", to: "SGD"), "SGD"))
                             GlassStatsCard(title: "Active", mainValue: "\(subscriptions.count)", subValue: "Subs")
                         }
                         .padding(.horizontal)
