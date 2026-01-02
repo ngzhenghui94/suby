@@ -26,6 +26,8 @@ struct AnalyticsView: View {
         data.reduce(0) { $0 + $1.amount }
     }
     
+    @State private var expandedCategory: String?
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -65,20 +67,63 @@ struct AnalyticsView: View {
                             // Listing
                             VStack(spacing: 12) {
                                 ForEach(data) { item in
-                                    HStack {
-                                        if let cat = SubscriptionCategory(rawValue: item.category) {
-                                            Image(systemName: cat.icon)
-                                                .foregroundStyle(Color(hex: cat.color))
+                                    VStack(spacing: 0) {
+                                        // Header Row
+                                        Button {
+                                            withAnimation(.spring()) {
+                                                if expandedCategory == item.category {
+                                                    expandedCategory = nil
+                                                } else {
+                                                    expandedCategory = item.category
+                                                }
+                                                HapticManager.selection()
+                                            }
+                                        } label: {
+                                            HStack {
+                                                if let cat = SubscriptionCategory(rawValue: item.category) {
+                                                    Image(systemName: cat.icon)
+                                                        .foregroundStyle(Color(hex: cat.color))
+                                                }
+                                                Text(item.category)
+                                                    .foregroundStyle(.white)
+                                                Spacer()
+                                                Text(item.amount, format: .currency(code: "USD"))
+                                                    .bold()
+                                                    .foregroundStyle(.white)
+                                                Image(systemName: "chevron.right")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.gray)
+                                                    .rotationEffect(.degrees(expandedCategory == item.category ? 90 : 0))
+                                            }
+                                            .padding()
+                                            .glassEffect()
                                         }
-                                        Text(item.category)
-                                            .foregroundStyle(.white)
-                                        Spacer()
-                                        Text(item.amount, format: .currency(code: "USD"))
-                                            .bold()
-                                            .foregroundStyle(.white)
+                                        
+                                        // Expanded Content
+                                        if expandedCategory == item.category {
+                                            VStack(spacing: 10) {
+                                                ForEach(subscriptions.filter { $0.category == item.category }) { sub in
+                                                    HStack {
+                                                        Text(sub.name)
+                                                            .font(.subheadline)
+                                                            .foregroundStyle(.white.opacity(0.8))
+                                                        Spacer()
+                                                        Text(currencyManager.convert(sub.monthlyCost, from: sub.currency, to: "USD"), format: .currency(code: "USD"))
+                                                            .font(.subheadline)
+                                                            .foregroundStyle(.white.opacity(0.8))
+                                                    }
+                                                    .padding(.horizontal)
+                                                    .padding(.vertical, 4)
+                                                }
+                                            }
+                                            .padding()
+                                            .background(Material.ultraThin)
+                                            .cornerRadius(12)
+                                            .padding(.horizontal)
+                                            .padding(.top, -10) // Tuck under
+                                            .zIndex(-1)
+                                        }
                                     }
-                                    .padding()
-                                    .glassEffect()
                                 }
                             }
                             .padding(.horizontal)

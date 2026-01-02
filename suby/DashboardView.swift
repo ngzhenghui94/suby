@@ -43,23 +43,6 @@ struct DashboardView: View {
                                 .foregroundStyle(.white)
                             Spacer()
                             
-                            // Analytics Button
-                            NavigationLink {
-                                AnalyticsView()
-                                    .environment(currencyManager)
-                                    .onAppear { HapticManager.selection() }
-                            } label: {
-                                Image(systemName: "chart.pie.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(Color(hex: accentColorHex))
-                                    .padding(10)
-                                    .background(Material.ultraThin)
-                                    .clipShape(Circle())
-                            }
-                            .simultaneousGesture(TapGesture().onEnded {
-                                HapticManager.impact(.light)
-                            })
-                            
                             Button {
                                 HapticManager.impact(.medium)
                                 showingAddSheet = true

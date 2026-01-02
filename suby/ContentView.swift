@@ -28,6 +28,11 @@ struct ContentView: View {
                     Label("Dashboard", systemImage: "square.grid.2x2.fill")
                 }
             
+            AnalyticsView()
+                .tabItem {
+                    Label("Analytics", systemImage: "chart.pie.fill")
+                }
+            
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle.fill")
