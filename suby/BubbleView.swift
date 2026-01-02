@@ -19,17 +19,26 @@ struct BubbleView: View {
         // Cap at some reasonable max if needed, or use log scale
         let baseSize: CGFloat = 80
         let costFactor: CGFloat = CGFloat(subscription.monthlyCost) * 1.5
-        return min(max(baseSize + costFactor, 80), 160) // Clamped between 80 and 160 for now
+        return min(max(baseSize + costFactor, 80), 160)
     }
+    
+    @State private var animate = false
     
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color(hex: subscription.colorHex).gradient(to: Color(hex: subscription.colorHex).opacity(0.6)))
-                .shadow(color: Color(hex: subscription.colorHex).opacity(0.6), radius: 10, x: 0, y: 5)
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: subscription.colorHex).opacity(1.0), Color(hex: subscription.colorHex).opacity(0.6)],
+                        center: .topLeading,
+                        startRadius: 5,
+                        endRadius: size
+                    )
+                )
+                .shadow(color: Color(hex: subscription.colorHex).opacity(0.6), radius: 12, x: 0, y: 8)
                 .overlay(
                     Circle()
-                        .stroke(LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                        .stroke(LinearGradient(colors: [.white.opacity(0.4), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)
                 )
             
             VStack(spacing: 4) {
@@ -55,6 +64,14 @@ struct BubbleView: View {
             .padding()
         }
         .frame(width: size, height: size)
+        .scaleEffect(animate ? 1.05 : 1.0)
+        .offset(y: animate ? -5 : 5)
+        .onAppear {
+            let delay = Double.random(in: 0...2)
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true).delay(delay)) {
+                animate.toggle()
+            }
+        }
     }
     
     func formatPrice(_ price: Double) -> String {

@@ -33,7 +33,7 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.background.ignoresSafeArea()
+                AnimatedBackgroundView()
                 
                 ScrollView {
                     VStack(spacing: 30) {
@@ -80,12 +80,15 @@ struct DashboardView: View {
                         .padding(.horizontal)
                         
                         // Bubbles Cloud
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100, maximum: 160), spacing: 15)], spacing: 15) {
-                            ForEach(subscriptions) { sub in
-                                BubbleView(subscription: sub)
-                                    .onTapGesture {
-                                        selectedSubscription = sub
-                                    }
+                        // Bubbles Cloud (Organic Spiral)
+                        Group {
+                            if !subscriptions.isEmpty {
+                                BubbleCloudView(subscriptions: subscriptions) { sub in
+                                    selectedSubscription = sub
+                                }
+                                .frame(height: 400) // Give it substantial space
+                            } else {
+                                ContentUnavailableView("No Subscriptions", systemImage: "bubble.left.and.bubble.right")
                             }
                         }
                         .padding(.horizontal)
@@ -177,6 +180,8 @@ struct GlassStatsCard: View {
                 .font(.system(.title2, design: .rounded))
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
             
             if let sub = subValue {
                 Text(sub)
