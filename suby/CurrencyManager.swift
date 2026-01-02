@@ -65,7 +65,7 @@ class CurrencyManager {
     }
 }
 
-struct ExchangeRateResponse: Codable {
+struct ExchangeRateResponse: Codable, Sendable {
     let result: String
     let rates: [String: Double]
 }
