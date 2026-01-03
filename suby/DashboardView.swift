@@ -12,7 +12,7 @@ struct DashboardView: View {
     @Query private var subscriptions: [Subscription]
     @State private var showingAddSheet = false
     @State private var selectedSubscription: Subscription?
-    @State private var currencyManager = CurrencyManager()
+    @Environment(CurrencyManager.self) private var currencyManager
     @AppStorage("accentColor") private var accentColorHex: String = "#5E5CE6"
     
     var totalMonthlyUSD: Double {

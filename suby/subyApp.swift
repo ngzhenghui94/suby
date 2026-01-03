@@ -23,10 +23,13 @@ struct subyApp: App {
         }
     }()
 
+    @State private var currencyManager = CurrencyManager()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
+        .environment(currencyManager)
         .modelContainer(sharedModelContainer)
     }
 }
