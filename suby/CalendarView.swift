@@ -13,6 +13,7 @@ struct CalendarView: View {
     @Environment(CurrencyManager.self) private var currencyManager
     
     @State private var currentDate = Date()
+    @State private var selectedDate: Date? = nil // New: Track selected date
     @State private var selectedSubscription: Subscription?
     
     private let calendar = Calendar.current
@@ -38,24 +39,19 @@ struct CalendarView: View {
             return days
         }
         
-        // Get the weekday of the first day (1 = Sunday, 2 = Monday, etc.)
         let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
-        // Convert to Monday-based (0 = Monday, 6 = Sunday)
         let offset = (firstWeekday + 5) % 7
         
-        // Add empty days for offset
         for _ in 0..<offset {
             days.append(nil)
         }
         
-        // Add all days of the month
         for day in range {
             if let date = calendar.date(byAdding: .day, value: day - 1, to: firstDayOfMonth) {
                 days.append(date)
             }
         }
         
-        // Fill remaining cells to complete grid (6 rows × 7 days = 42 cells)
         while days.count < 42 {
             days.append(nil)
         }
@@ -63,6 +59,7 @@ struct CalendarView: View {
         return days
     }
     
+    // Total cost for the ENTRIE month displayed
     private var monthlyTotal: Double {
         subscriptionsForMonth(currentMonth).reduce(0) { total, sub in
             let cost = sub.billingCycle == "Yearly" ? sub.price / 12 : sub.price
@@ -72,6 +69,12 @@ struct CalendarView: View {
     
     private var remainingAmount: Double {
         let today = Date()
+        // Determine "remaining" based on real time today, not the calendar view time
+        // Only makes sense if we are viewing the CURRENT month
+        if !calendar.isDate(currentMonth, equalTo: today, toGranularity: .month) {
+            return 0 // For past/future months, concept of "remaining" is less relevant or simply full amount
+        }
+        
         let upcomingSubs = subscriptionsForMonth(currentMonth).filter { sub in
             if let paymentDate = paymentDateInMonth(for: sub, in: currentMonth) {
                 return paymentDate >= today
@@ -85,19 +88,30 @@ struct CalendarView: View {
         }
     }
     
-    private var upcomingPayments: [(Subscription, Date, Int)] {
+    // New Logic: Show payments based on selection state
+    private var displayedPayments: [(Subscription, Date, Int)] {
         let today = Date()
         var results: [(Subscription, Date, Int)] = []
         
-        for sub in subscriptions {
-            if let paymentDate = paymentDateInMonth(for: sub, in: currentMonth),
-               paymentDate >= today {
-                let daysLeft = calendar.dateComponents([.day], from: today, to: paymentDate).day ?? 0
-                results.append((sub, paymentDate, daysLeft))
+        // If a specific date is selected, filter for that. Otherwise, show whole month.
+        let targetDates = selectedDate != nil ? [selectedDate!] : daysInMonth.compactMap { $0 }
+        
+        for date in targetDates {
+            // Optimization: Skip if date is not in the currently viewed month (unless we allowed cross-month selection, but here we scope to view)
+            if !calendar.isDate(date, equalTo: currentMonth, toGranularity: .month) { continue }
+            
+            let subsOnDate = subscriptionsForDate(date)
+            for sub in subsOnDate {
+                let daysDiff = calendar.dateComponents([.day], from: today, to: date).day ?? 0
+                results.append((sub, date, daysDiff))
             }
         }
         
-        return results.sorted { $0.2 < $1.2 }
+        // Sort by date, then by name
+        return results.sorted {
+            if $0.1 != $1.1 { return $0.1 < $1.1 }
+            return $0.0.name < $1.0.name
+        }
     }
     
     // MARK: - Body
@@ -118,10 +132,8 @@ struct CalendarView: View {
                             .glassEffect()
                             .padding(.horizontal)
                         
-                        // Upcoming Payments
-                        if !upcomingPayments.isEmpty {
-                            upcomingPaymentsView
-                        }
+                        // Dynamic Payments List
+                        paymentsListView
                     }
                     .padding(.top)
                     .padding(.bottom, 50)
@@ -132,6 +144,9 @@ struct CalendarView: View {
             .sheet(item: $selectedSubscription) { sub in
                 AddSubscriptionView(subscription: sub)
                     .presentationDetents([.medium, .large])
+            }
+            .onAppear {
+                 // Reset selection when appearing if needed, or keep state
             }
         }
     }
@@ -151,7 +166,8 @@ struct CalendarView: View {
                         .font(.headline)
                         .foregroundStyle(.white)
                     
-                    if remainingAmount > 0 && remainingAmount < monthlyTotal {
+                    // Show "left" only if viewing current month
+                    if calendar.isDate(currentMonth, equalTo: Date(), toGranularity: .month) && remainingAmount > 0 {
                         Text("(\(formatCurrency(remainingAmount)) left)")
                             .font(.subheadline)
                             .foregroundStyle(.gray)
@@ -210,14 +226,20 @@ struct CalendarView: View {
                             date: date,
                             subscriptions: subscriptionsForDate(date),
                             isToday: calendar.isDateInToday(date),
-                            onTap: { sub in
-                                selectedSubscription = sub
+                            isSelected: isSelected(date),
+                            onTap: {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    if selectedDate == date {
+                                        selectedDate = nil // Deselect if tapping same date
+                                    } else {
+                                        selectedDate = date
+                                    }
+                                }
                                 HapticManager.selection()
                             }
                         )
                     } else {
-                        Color.clear
-                            .frame(height: 44)
+                        Color.clear.frame(height: 44)
                     }
                 }
             }
@@ -225,25 +247,52 @@ struct CalendarView: View {
         }
     }
     
-    private var upcomingPaymentsView: some View {
+    private var paymentsListView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Upcoming Payments")
-                .font(.headline)
-                .foregroundStyle(.gray)
-                .padding(.horizontal)
-            
-            ForEach(upcomingPayments.prefix(5), id: \.0.id) { sub, date, daysLeft in
-                UpcomingPaymentRow(
-                    subscription: sub,
-                    paymentDate: date,
-                    daysLeft: daysLeft
-                )
-                .onTapGesture {
-                    selectedSubscription = sub
-                    HapticManager.selection()
+            // Dynamic Header
+            HStack {
+                if let selected = selectedDate {
+                    Text("Due on \(formatDateHeader(selected))")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    
+                    Spacer()
+                    
+                    Button("Show All") {
+                        withAnimation {
+                            selectedDate = nil
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(Color(hex: "#5E5CE6"))
+                } else {
+                    Text("Payments in \(monthYearString)")
+                        .font(.headline)
+                        .foregroundStyle(.gray)
                 }
             }
             .padding(.horizontal)
+            
+            if displayedPayments.isEmpty {
+                ContentUnavailableView(
+                    selectedDate == nil ? "No payments this month" : "No payments due",
+                    systemImage: "calendar.badge.checkmark"
+                )
+                .padding(.top, 20)
+            } else {
+                ForEach(displayedPayments, id: \.0.id) { sub, date, daysDiff in
+                    PaymentListRow(
+                        subscription: sub,
+                        paymentDate: date,
+                        daysDiff: daysDiff
+                    )
+                    .onTapGesture {
+                        selectedSubscription = sub
+                        HapticManager.selection()
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
     }
     
@@ -252,12 +301,14 @@ struct CalendarView: View {
     private func goToPreviousMonth() {
         if let newDate = calendar.date(byAdding: .month, value: -1, to: currentDate) {
             currentDate = newDate
+            selectedDate = nil // Reset selection on change
         }
     }
     
     private func goToNextMonth() {
         if let newDate = calendar.date(byAdding: .month, value: 1, to: currentDate) {
             currentDate = newDate
+            selectedDate = nil // Reset selection on change
         }
     }
     
@@ -275,39 +326,33 @@ struct CalendarView: View {
     
     private func paymentDateInMonth(for subscription: Subscription, in month: Date) -> Date? {
         let startDay = calendar.component(.day, from: subscription.startDate)
-        
         guard let range = calendar.range(of: .day, in: .month, for: month) else { return nil }
         
-        // Handle months with fewer days than the start date
         let payDay = min(startDay, range.count)
-        
         var components = calendar.dateComponents([.year, .month], from: month)
         components.day = payDay
         
         guard let paymentDate = calendar.date(from: components) else { return nil }
         
-        // Check if subscription was active by this date
-        if subscription.startDate > paymentDate {
-            return nil
-        }
+        if subscription.startDate > paymentDate { return nil }
         
-        // For yearly subscriptions, check if this is the correct month
         if subscription.billingCycle == "Yearly" {
             let startMonth = calendar.component(.month, from: subscription.startDate)
             let currentMonth = calendar.component(.month, from: month)
-            if startMonth != currentMonth {
-                return nil
-            }
+            if startMonth != currentMonth { return nil }
         }
         
         return paymentDate
     }
     
     private func isPaymentDate(for subscription: Subscription, on date: Date) -> Bool {
-        guard let paymentDate = paymentDateInMonth(for: subscription, in: date) else {
-            return false
-        }
+        guard let paymentDate = paymentDateInMonth(for: subscription, in: date) else { return false }
         return calendar.isDate(paymentDate, inSameDayAs: date)
+    }
+    
+    private func isSelected(_ date: Date) -> Bool {
+        guard let selected = selectedDate else { return false }
+        return calendar.isDate(selected, inSameDayAs: date)
     }
     
     private func formatCurrency(_ value: Double) -> String {
@@ -317,6 +362,12 @@ struct CalendarView: View {
         formatter.maximumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value)) ?? "$0"
     }
+    
+    private func formatDateHeader(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
 }
 
 // MARK: - Calendar Day Cell
@@ -325,7 +376,8 @@ struct CalendarDayCell: View {
     let date: Date
     let subscriptions: [Subscription]
     let isToday: Bool
-    let onTap: (Subscription) -> Void
+    let isSelected: Bool
+    let onTap: () -> Void
     
     private var dayNumber: String {
         let formatter = DateFormatter()
@@ -334,46 +386,46 @@ struct CalendarDayCell: View {
     }
     
     var body: some View {
-        VStack(spacing: 2) {
-            Text(dayNumber)
-                .font(.system(.subheadline, design: .rounded))
-                .fontWeight(isToday ? .bold : .regular)
-                .foregroundStyle(isToday ? .white : .gray)
-            
-            if !subscriptions.isEmpty {
-                HStack(spacing: 2) {
-                    ForEach(subscriptions.prefix(3)) { sub in
-                        Circle()
-                            .fill(Color(hex: sub.colorHex))
-                            .frame(width: 8, height: 8)
-                            .onTapGesture {
-                                onTap(sub)
-                            }
+        Button(action: onTap) {
+            VStack(spacing: 4) {
+                Text(dayNumber)
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight((isToday || isSelected) ? .bold : .regular)
+                    .foregroundStyle(isSelected ? .white : (isToday ? Color(hex: "#5E5CE6") : .gray))
+                
+                if !subscriptions.isEmpty {
+                    HStack(spacing: 2) {
+                        ForEach(subscriptions.prefix(3)) { sub in
+                            Circle()
+                                .fill(Color(hex: sub.colorHex))
+                                .frame(width: 6, height: 6)
+                        }
                     }
-                    
-                    if subscriptions.count > 3 {
-                        Text("+\(subscriptions.count - 3)")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.gray)
-                    }
+                } else {
+                    Spacer().frame(height: 6) // Keep alignment consistent
                 }
             }
+            .frame(height: 44)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color(hex: "#5E5CE6") : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isToday && !isSelected ? Color(hex: "#5E5CE6").opacity(0.5) : Color.clear, lineWidth: 1)
+            )
         }
-        .frame(height: 44)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isToday ? Color(hex: "#5E5CE6").opacity(0.3) : Color.clear)
-        )
+        .buttonStyle(.plain)
     }
 }
 
-// MARK: - Upcoming Payment Row
+// MARK: - Payment List Row (Renamed)
 
-struct UpcomingPaymentRow: View {
+struct PaymentListRow: View {
     let subscription: Subscription
     let paymentDate: Date
-    let daysLeft: Int
+    let daysDiff: Int // <0: Past, 0: Today, >0: Future
     
     @Environment(CurrencyManager.self) private var currencyManager
     
@@ -383,19 +435,41 @@ struct UpcomingPaymentRow: View {
         return formatter.string(from: paymentDate)
     }
     
+    private var statusText: String {
+        if daysDiff < 0 {
+            return "Paid"
+        } else if daysDiff == 0 {
+            return "Today"
+        } else if daysDiff == 1 {
+            return "Tomorrow"
+        } else {
+            return "\(daysDiff) days"
+        }
+    }
+    
+    private var statusColor: Color {
+        if daysDiff < 0 {
+            return .gray.opacity(0.6)
+        } else if daysDiff <= 3 {
+            return Color(hex: "#FF9F0A") // Warning
+        } else {
+            return .gray
+        }
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Icon
             Circle()
                 .fill(Color(hex: subscription.colorHex))
-                .frame(width: 36, height: 36)
+                .frame(width: 40, height: 40)
                 .overlay(
                     Image(systemName: subscription.iconName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                 )
             
-            // Name
+            // Name & Status
             VStack(alignment: .leading, spacing: 2) {
                 Text(subscription.name)
                     .font(.subheadline)
@@ -409,15 +483,21 @@ struct UpcomingPaymentRow: View {
             
             Spacer()
             
-            // Date & Days Left
+            // Cost & Date Info
             VStack(alignment: .trailing, spacing: 2) {
-                Text(dateString)
+                Text(currencyManager.convert(subscription.price, from: subscription.currency, to: "USD"), format: .currency(code: "USD"))
                     .font(.subheadline)
+                    .fontWeight(.bold)
                     .foregroundStyle(.white)
                 
-                Text(daysLeft == 0 ? "Today" : "\(daysLeft) days left")
-                    .font(.caption)
-                    .foregroundStyle(daysLeft <= 3 ? Color(hex: "#FF9F0A") : .gray)
+                HStack(spacing: 4) {
+                    Text(dateString)
+                    Text("•")
+                    Text(statusText)
+                        .foregroundStyle(statusColor)
+                }
+                .font(.caption2)
+                .foregroundStyle(.gray)
             }
         }
         .padding()
